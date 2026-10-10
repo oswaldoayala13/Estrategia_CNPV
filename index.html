@@ -2966,97 +2966,12 @@ R_d = \max(0, C_d - C_0)
   const pct = x => (x == null || !Number.isFinite(Number(x))) ? 'N/D' : (100*Number(x)).toLocaleString('es-HN',{maximumFractionDigits:1,minimumFractionDigits:1})+'%';
   const safe = x => String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const depto = $('resumen-depto'), muni = $('resumen-muni');
-  const deptos = [...new Map(catalogo.map(c=>[c.depto_codigo,{id:String(c.depto_codigo),nombre:c.depto_nombre}])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-  const registros = catalogo.map((c,i)=>({catalogo:c, dato:datos[i]}));
-  const cols = [
-    ['Departamento',r=>r.depto],
-    ['Municipio',r=>r.municipio],
-    ['Avance de estructuras',r=>pct(r.porcentaje_avance)],
-    ['Rezago poblacional',r=>fmt(r.rezago_poblacional)],
-    ['Días estimados: grupo con producción',r=>fmt(r.dias_recuperacion)],
-    ['Días estimados: grupo sin producción',r=>fmt(r.dias_sin_produccion)],
-    ['Días estimados por estructuras (general)',r=>fmt(r.dias_adicionales)],
-    ['Viviendas equivalentes por población',r=>fmt(r.viviendas_equivalentes_poblacion)],
-    ['Días estimados por población',r=>fmt(r.dias_estimados_por_poblacion)],
-    ['Máximo de días estimados',r=>fmt(r.dias_recuperacion_integral)]
-  ];
-  deptos.forEach(d=>depto.add(new Option(d.nombre,d.id)));
-  function cargarMunicipios(){
-    const anterior=muni.value;
-    muni.innerHTML='';
-    muni.add(new Option('Todos los municipios','__TODOS__'));
-    catalogo.filter(c=>String(c.depto_codigo)===depto.value)
-      .sort((a,b)=>a.municipio.localeCompare(b.municipio,'es'))
-      .forEach(c=>muni.add(new Option(c.municipio,String(c.muni_codigo))));
-    if([...muni.options].some(o=>o.value===anterior)) muni.value=anterior;
-    else muni.value='__TODOS__';
-  }
-  function seleccion(){
-    return registros.filter(o=>String(o.catalogo.depto_codigo)===depto.value &&
-      (muni.value==='__TODOS__' || String(o.catalogo.muni_codigo)===muni.value))
-      .map(o=>o.dato).sort((a,b)=>String(a.municipio).localeCompare(String(b.municipio),'es'));
-  }
-  function render(){
-    const rows=seleccion();
-    $('resumen-conteo').textContent=`${rows.length} municipio(s) en la selección. Los días corresponden a estimaciones independientes por escenario; el máximo no suma los escenarios.`;
-    $('tabla-resumen-municipal').innerHTML='<div class="table-scroll"><table id="tabla-exportable"><thead><tr>'+
-      cols.map(c=>'<th>'+safe(c[0])+'</th>').join('')+'</tr></thead><tbody>'+
-      rows.map(r=>'<tr>'+cols.map(c=>'<td>'+safe(c[1](r))+'</td>').join('')+'</tr>').join('')+
-      '</tbody></table></div>';
-    $('estado-exportacion').textContent='';
-  }
-  function matrix(){
-    const rows=seleccion();
-    return [cols.map(c=>c[0]),...rows.map(r=>cols.map(c=>c[1](r)))];
-  }
-  function csvText(){
-    return '\ufeff'+matrix().map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
-  }
-  function descargar(blob,nombre){
-    const url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download=nombre;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-  }
-  $('exportar-csv').addEventListener('click',()=>{
-    descargar(new Blob([csvText()],{type:'text/csv;charset=utf-8;'}),'resumen_municipal_cnpv.csv');
-    $('estado-exportacion').textContent='CSV generado con la selección actual.';
-  });
-  $('exportar-xlsx').addEventListener('click',()=>{
-    const html='<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'+ $('tabla-exportable').outerHTML +'</body></html>';
-    descargar(new Blob(['\ufeff',html],{type:'application/vnd.ms-excel;charset=utf-8;'}),'resumen_municipal_cnpv.xls');
-    $('estado-exportacion').textContent='Archivo compatible con Excel generado con la selección actual.';
-  });
-  $('copiar-tabla').addEventListener('click',async()=>{
-    const m=matrix(),text=m.map(row=>row.join('\t')).join('\n');
-    try{
-      await navigator.clipboard.writeText(text);
-      $('estado-exportacion').textContent='Tabla copiada. Puedes pegarla directamente en Excel.';
-    }catch(e){
-      const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
-      const ok=document.execCommand('copy');ta.remove();
-      $('estado-exportacion').textContent=ok?'Tabla copiada. Puedes pegarla directamente en Excel.':'No se pudo copiar automáticamente; selecciona la tabla y cópiala manualmente.';
-    }
-  });
-  depto.addEventListener('change',()=>{cargarMunicipios();render();});
-  muni.addEventListener('change',render);
-  if(deptos.length){depto.value=deptos[0].id;cargarMunicipios();render();}
-})();
-</script>
-<script>
-(function(){
-  const datos = JSON.parse(document.getElementById('datos-municipios').textContent);
-  const catalogo = JSON.parse(document.getElementById('catalogo-filtros').textContent);
-  const $ = id => document.getElementById(id);
-  const fmt = x => (x == null || !Number.isFinite(Number(x))) ? 'N/D' : Number(x).toLocaleString('es-HN',{maximumFractionDigits:0});
-  const pct = x => (x == null || !Number.isFinite(Number(x))) ? 'N/D' : (100*Number(x)).toLocaleString('es-HN',{maximumFractionDigits:1,minimumFractionDigits:1})+'%';
-  const safe = x => String(x ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const depto = $('resumen-depto'), muni = $('resumen-muni');
-  if(!depto || !muni) return;
-  const deptos = [...new Map(catalogo.map(c=>[String(c.depto_codigo),{id:String(c.depto_codigo),nombre:c.depto_nombre}])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if (!depto || !muni) return;
   const registros = catalogo.map((c,i)=>({catalogo:c,dato:datos[i]}));
+  const deptos = [...new Map(catalogo.map(c=>[String(c.depto_codigo),{id:String(c.depto_codigo),nombre:c.depto_nombre}])).values()].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const cols = [
-    ['Departamento',r=>r.depto],
-    ['Municipio',r=>r.municipio],
-    ['Avance (%)',r=>pct(r.porcentaje_avance)],
+    ['Departamento',r=>r.depto],['Municipio',r=>r.municipio],
+    ['Avance de estructuras',r=>pct(r.porcentaje_avance)],
     ['Rezago poblacional (personas)',r=>fmt(r.rezago_poblacional)],
     ['Días estimados: grupo con producción',r=>fmt(r.dias_recuperacion)],
     ['Días estimados: grupo sin producción',r=>fmt(r.dias_sin_produccion)],
@@ -3065,11 +2980,17 @@ R_d = \max(0, C_d - C_0)
     ['Días estimados por población',r=>fmt(r.dias_estimados_por_poblacion)],
     ['Máximo de días estimados',r=>fmt(r.dias_recuperacion_integral)]
   ];
+  depto.add(new Option('Nivel Nacional — todos los municipios','__NACIONAL__'));
   deptos.forEach(d=>depto.add(new Option(d.nombre,d.id)));
   function cargarMunicipios(){
     const anterior=muni.value;
     muni.innerHTML='';
-    muni.add(new Option('Todos los municipios','__TODOS__'));
+    if(depto.value==='__NACIONAL__'){
+      muni.add(new Option('Todos los municipios (nivel nacional)','__TODOS__'));
+      muni.value='__TODOS__'; muni.disabled=true; return;
+    }
+    muni.disabled=false;
+    muni.add(new Option('Todos los municipios del departamento','__TODOS__'));
     catalogo.filter(c=>String(c.depto_codigo)===depto.value)
       .sort((a,b)=>a.municipio.localeCompare(b.municipio,'es'))
       .forEach(c=>muni.add(new Option(c.municipio,String(c.muni_codigo))));
@@ -3077,27 +2998,30 @@ R_d = \max(0, C_d - C_0)
     else muni.value='__TODOS__';
   }
   function seleccion(){
-    return registros.filter(o=>String(o.catalogo.depto_codigo)===depto.value &&
-      (muni.value==='__TODOS__' || String(o.catalogo.muni_codigo)===muni.value))
-      .map(o=>o.dato).sort((a,b)=>String(a.municipio).localeCompare(String(b.municipio),'es'));
+    let elegidos=registros;
+    if(depto.value!=='__NACIONAL__'){
+      elegidos=elegidos.filter(o=>String(o.catalogo.depto_codigo)===depto.value);
+      if(muni.value!=='__TODOS__') elegidos=elegidos.filter(o=>String(o.catalogo.muni_codigo)===muni.value);
+    }
+    return elegidos.map(o=>o.dato).sort((a,b)=>String(a.depto).localeCompare(String(b.depto),'es')||String(a.municipio).localeCompare(String(b.municipio),'es'));
   }
   function render(){
     const rows=seleccion();
-    $('resumen-conteo').textContent=`${rows.length} municipio(s) en la selección.`;
+    const nivel=depto.value==='__NACIONAL__'?'Nivel nacional':depto.options[depto.selectedIndex]?.text||'Departamento';
+    $('resumen-conteo').textContent=`${rows.length} municipio(s) | ${nivel}. La exportación incluirá exactamente las filas visibles.`;
     $('tabla-resumen-municipal').innerHTML='<div class="table-scroll"><table id="tabla-exportable"><thead><tr>'+
       cols.map(c=>'<th>'+safe(c[0])+'</th>').join('')+'</tr></thead><tbody>'+
-      rows.map(r=>'<tr>'+cols.map(c=>'<td>'+safe(c[1](r))+'</td>').join('')+'</tr>').join('')+
-      '</tbody></table></div>';
+      rows.map(r=>'<tr>'+cols.map(c=>'<td>'+safe(c[1](r))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
     $('estado-exportacion').textContent='';
   }
   function matrix(){const rows=seleccion();return [cols.map(c=>c[0]),...rows.map(r=>cols.map(c=>c[1](r)))];}
   function csvText(){return '\ufeff'+matrix().map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');}
   function descargar(blob,nombre){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=nombre;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}
   $('exportar-csv').addEventListener('click',()=>{descargar(new Blob([csvText()],{type:'text/csv;charset=utf-8;'}),'resumen_municipal_cnpv.csv');$('estado-exportacion').textContent='CSV generado con la selección actual.';});
-  $('exportar-xlsx').addEventListener('click',()=>{const html='<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'+ $('tabla-exportable').outerHTML +'</body></html>';descargar(new Blob(['\ufeff',html],{type:'application/vnd.ms-excel;charset=utf-8;'}),'resumen_municipal_cnpv.xls');$('estado-exportacion').textContent='Archivo compatible con Excel generado.';});
-  $('copiar-tabla').addEventListener('click',async()=>{const text=matrix().map(row=>row.join('\t')).join('\n');try{await navigator.clipboard.writeText(text);$('estado-exportacion').textContent='Tabla copiada. Puedes pegarla en Excel.';}catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();$('estado-exportacion').textContent=ok?'Tabla copiada.':'No se pudo copiar automáticamente.';}});
+  $('exportar-xlsx').addEventListener('click',()=>{const tabla=$('tabla-exportable');if(!tabla)return;const html='<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>'+tabla.outerHTML+'</body></html>';descargar(new Blob(['\ufeff',html],{type:'application/vnd.ms-excel;charset=utf-8;'}),'resumen_municipal_cnpv.xls');$('estado-exportacion').textContent='Archivo compatible con Excel generado con la selección actual.';});
+  $('copiar-tabla').addEventListener('click',async()=>{const text=matrix().map(row=>row.join('\t')).join('\n');try{await navigator.clipboard.writeText(text);$('estado-exportacion').textContent='Tabla copiada. Puedes pegarla directamente en Excel.';}catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();$('estado-exportacion').textContent=ok?'Tabla copiada. Puedes pegarla en Excel.':'No se pudo copiar automáticamente.';}});
   depto.addEventListener('change',()=>{cargarMunicipios();render();});muni.addEventListener('change',render);
-  if(deptos.length){depto.value=deptos[0].id;cargarMunicipios();render();}
+  depto.value='__NACIONAL__'; cargarMunicipios(); render();
 })();
 </script>
 
